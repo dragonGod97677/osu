@@ -3,16 +3,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using JetBrains.Annotations;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Graphics.Video;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
+using osu.Game.Skinning;
 
 namespace osu.Game.Beatmaps
 {
@@ -20,7 +23,7 @@ namespace osu.Game.Beatmaps
     {
         private readonly TextureStore textures;
 
-        public DummyWorkingBeatmap(AudioManager audio, TextureStore textures)
+        public DummyWorkingBeatmap([NotNull] AudioManager audio, TextureStore textures)
             : base(new BeatmapInfo
             {
                 Metadata = new BeatmapMetadata
@@ -45,19 +48,21 @@ namespace osu.Game.Beatmaps
 
         protected override Texture GetBackground() => textures?.Get(@"Backgrounds/bg4");
 
-        protected override VideoSprite GetVideo() => null;
+        protected override Track GetBeatmapTrack() => GetVirtualTrack();
 
-        protected override Track GetTrack() => GetVirtualTrack();
+        protected override ISkin GetSkin() => null;
+
+        public override Stream GetStream(string storagePath) => null;
 
         private class DummyRulesetInfo : RulesetInfo
         {
-            public override Ruleset CreateInstance() => new DummyRuleset(this);
+            public override Ruleset CreateInstance() => new DummyRuleset();
 
             private class DummyRuleset : Ruleset
             {
-                public override IEnumerable<Mod> GetModsFor(ModType type) => new Mod[] { };
+                public override IEnumerable<Mod> GetModsFor(ModType type) => Array.Empty<Mod>();
 
-                public override DrawableRuleset CreateDrawableRulesetWith(IWorkingBeatmap beatmap, IReadOnlyList<Mod> mods)
+                public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod> mods = null)
                 {
                     throw new NotImplementedException();
                 }
@@ -70,20 +75,15 @@ namespace osu.Game.Beatmaps
 
                 public override string ShortName => "dummy";
 
-                public DummyRuleset(RulesetInfo rulesetInfo = null)
-                    : base(rulesetInfo)
-                {
-                }
-
                 private class DummyBeatmapConverter : IBeatmapConverter
                 {
                     public event Action<HitObject, IEnumerable<HitObject>> ObjectConverted;
 
                     public IBeatmap Beatmap { get; set; }
 
-                    public bool CanConvert => true;
+                    public bool CanConvert() => true;
 
-                    public IBeatmap Convert()
+                    public IBeatmap Convert(CancellationToken cancellationToken = default)
                     {
                         foreach (var obj in Beatmap.HitObjects)
                             ObjectConverted?.Invoke(obj, obj.Yield());

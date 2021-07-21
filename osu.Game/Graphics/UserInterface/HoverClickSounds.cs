@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Linq;
@@ -17,7 +17,7 @@ namespace osu.Game.Graphics.UserInterface
     /// </summary>
     public class HoverClickSounds : HoverSounds
     {
-        private SampleChannel sampleClick;
+        private Sample sampleClick;
         private readonly MouseButton[] buttons;
 
         /// <summary>
@@ -28,7 +28,7 @@ namespace osu.Game.Graphics.UserInterface
         /// Array of button codes which should trigger the click sound.
         /// If this optional parameter is omitted or set to <code>null</code>, the click sound will only be played on left click.
         /// </param>
-        public HoverClickSounds(HoverSampleSet sampleSet = HoverSampleSet.Normal, MouseButton[] buttons = null)
+        public HoverClickSounds(HoverSampleSet sampleSet = HoverSampleSet.Default, MouseButton[] buttons = null)
             : base(sampleSet)
         {
             this.buttons = buttons ?? new[] { MouseButton.Left };
@@ -45,7 +45,8 @@ namespace osu.Game.Graphics.UserInterface
         [BackgroundDependencyLoader]
         private void load(AudioManager audio)
         {
-            sampleClick = audio.Samples.Get($@"UI/generic-select{SampleSet.GetDescription()}");
+            sampleClick = audio.Samples.Get($@"UI/{SampleSet.GetDescription()}-select")
+                          ?? audio.Samples.Get($@"UI/{HoverSampleSet.Default.GetDescription()}-select");
         }
     }
 }

@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -19,23 +18,29 @@ namespace osu.Game.Skinning
         [Resolved]
         private TextureStore textures { get; set; }
 
-        public SkinnableSprite(string textureName, Func<ISkinSource, bool> allowFallback = null, ConfineMode confineMode = ConfineMode.ScaleDownToFit)
-            : base(new SpriteComponent(textureName), allowFallback, confineMode)
+        public SkinnableSprite(string textureName, ConfineMode confineMode = ConfineMode.NoScaling)
+            : base(new SpriteComponent(textureName), confineMode)
         {
         }
 
-        protected override Drawable CreateDefault(ISkinComponent component) => new Sprite { Texture = textures.Get(component.LookupName) };
+        protected override Drawable CreateDefault(ISkinComponent component)
+        {
+            var texture = textures.Get(component.LookupName);
+
+            if (texture == null)
+                return null;
+
+            return new Sprite { Texture = texture };
+        }
 
         private class SpriteComponent : ISkinComponent
         {
-            private readonly string textureName;
-
             public SpriteComponent(string textureName)
             {
-                this.textureName = textureName;
+                LookupName = textureName;
             }
 
-            public string LookupName => textureName;
+            public string LookupName { get; }
         }
     }
 }

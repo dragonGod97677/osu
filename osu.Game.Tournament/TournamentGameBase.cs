@@ -1,46 +1,38 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Drawing;
+using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
-using osu.Framework.Configuration;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API.Requests;
+using osu.Game.Tournament.IO;
 using osu.Game.Tournament.IPC;
 using osu.Game.Tournament.Models;
-using osuTK.Graphics;
+using osu.Game.Users;
 using osuTK.Input;
 
 namespace osu.Game.Tournament
 {
-    public abstract class TournamentGameBase : OsuGameBase
+    [Cached(typeof(TournamentGameBase))]
+    public class TournamentGameBase : OsuGameBase
     {
         private const string bracket_filename = "bracket.json";
-
         private LadderInfo ladder;
-
-        private Storage storage;
-
+        private TournamentStorage storage;
         private DependencyContainer dependencies;
-
-        private Bindable<Size> windowSize;
         private FileBasedIPC ipc;
 
-        private Drawable heightWarning;
+        protected Task BracketLoadTask => taskCompletionSource.Task;
+
+        private readonly TaskCompletionSource<bool> taskCompletionSource = new TaskCompletionSource<bool>();
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
@@ -48,70 +40,20 @@ namespace osu.Game.Tournament
         }
 
         [BackgroundDependencyLoader]
-        private void load(Storage storage, FrameworkConfigManager frameworkConfig)
+        private void load(Storage baseStorage)
         {
-            Resources.AddStore(new DllResourceStore(@"osu.Game.Tournament.dll"));
+            Resources.AddStore(new DllResourceStore(typeof(TournamentGameBase).Assembly));
 
-            Fonts.AddStore(new GlyphStore(Resources, @"Resources/Fonts/Aquatico-Regular"));
-            Fonts.AddStore(new GlyphStore(Resources, @"Resources/Fonts/Aquatico-Light"));
+            dependencies.CacheAs<Storage>(storage = new TournamentStorage(baseStorage));
+            dependencies.CacheAs(storage);
 
-            Textures.AddStore(new TextureLoaderStore(new ResourceStore<byte[]>(new StorageBackedResourceStore(storage))));
+            dependencies.Cache(new TournamentVideoResourceStore(storage));
 
-            this.storage = storage;
+            Textures.AddStore(new TextureLoaderStore(new StorageBackedResourceStore(storage)));
 
-            windowSize = frameworkConfig.GetBindable<Size>(FrameworkSetting.WindowedSize);
-            windowSize.BindValueChanged(size => ScheduleAfterChildren(() =>
-            {
-                var minWidth = (int)(size.NewValue.Height / 9f * 16 + 400);
+            dependencies.CacheAs(new StableInfo(storage));
 
-                heightWarning.Alpha = size.NewValue.Width < minWidth ? 1 : 0;
-            }), true);
-
-            readBracket();
-
-            ladder.CurrentMatch.Value = ladder.Matches.FirstOrDefault(p => p.Current.Value);
-
-            dependencies.CacheAs<MatchIPCInfo>(ipc = new FileBasedIPC());
-            Add(ipc);
-
-            AddRange(new[]
-            {
-                new OsuButton
-                {
-                    Text = "Save Changes",
-                    Width = 140,
-                    Height = 50,
-                    Depth = float.MinValue,
-                    Anchor = Anchor.BottomRight,
-                    Origin = Anchor.BottomRight,
-                    Padding = new MarginPadding(10),
-                    Action = SaveChanges,
-                },
-                heightWarning = new Container
-                {
-                    Masking = true,
-                    CornerRadius = 5,
-                    Depth = float.MinValue,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    AutoSizeAxes = Axes.Both,
-                    Children = new Drawable[]
-                    {
-                        new Box
-                        {
-                            Colour = Color4.Red,
-                            RelativeSizeAxes = Axes.Both,
-                        },
-                        new SpriteText
-                        {
-                            Text = "Please make the window wider",
-                            Font = OsuFont.Default.With(weight: "bold"),
-                            Colour = Color4.White,
-                            Padding = new MarginPadding(20)
-                        }
-                    }
-                },
-            });
+            Task.Run(readBracket);
         }
 
         private void readBracket()
@@ -120,14 +62,11 @@ namespace osu.Game.Tournament
             {
                 using (Stream stream = storage.GetStream(bracket_filename, FileAccess.Read, FileMode.Open))
                 using (var sr = new StreamReader(stream))
-                    ladder = JsonConvert.DeserializeObject<LadderInfo>(sr.ReadToEnd());
-            }
-            else
-            {
-                ladder = new LadderInfo();
+                    ladder = JsonConvert.DeserializeObject<LadderInfo>(sr.ReadToEnd(), new JsonPointConverter());
             }
 
-            dependencies.Cache(ladder);
+            ladder ??= new LadderInfo();
+            ladder.Ruleset.Value ??= RulesetStore.AvailableRulesets.First();
 
             bool addedInfo = false;
 
@@ -165,15 +104,17 @@ namespace osu.Game.Tournament
 
             // link matches to rounds
             foreach (var round in ladder.Rounds)
-            foreach (var id in round.Matches)
             {
-                var found = ladder.Matches.FirstOrDefault(p => p.ID == id);
-
-                if (found != null)
+                foreach (var id in round.Matches)
                 {
-                    found.Round.Value = round;
-                    if (round.StartDate.Value > found.Date.Value)
-                        found.Date.Value = round.StartDate.Value;
+                    var found = ladder.Matches.FirstOrDefault(p => p.ID == id);
+
+                    if (found != null)
+                    {
+                        found.Round.Value = round;
+                        if (round.StartDate.Value > found.Date.Value)
+                            found.Date.Value = round.StartDate.Value;
+                    }
                 }
             }
 
@@ -182,26 +123,41 @@ namespace osu.Game.Tournament
 
             if (addedInfo)
                 SaveChanges();
+
+            ladder.CurrentMatch.Value = ladder.Matches.FirstOrDefault(p => p.Current.Value);
+
+            Schedule(() =>
+            {
+                Ruleset.BindTo(ladder.Ruleset);
+
+                dependencies.Cache(ladder);
+                dependencies.CacheAs<MatchIPCInfo>(ipc = new FileBasedIPC());
+                Add(ipc);
+
+                taskCompletionSource.SetResult(true);
+            });
         }
 
         /// <summary>
         /// Add missing player info based on user IDs.
         /// </summary>
-        /// <returns></returns>
         private bool addPlayers()
         {
             bool addedInfo = false;
 
             foreach (var t in ladder.Teams)
-            foreach (var p in t.Players)
-                if (string.IsNullOrEmpty(p.Username))
+            {
+                foreach (var p in t.Players)
                 {
-                    var req = new GetUserRequest(p.Id);
-                    req.Perform(API);
-                    p.Username = req.Result.Username;
-
-                    addedInfo = true;
+                    if (string.IsNullOrEmpty(p.Username)
+                        || p.Statistics?.GlobalRank == null
+                        || p.Statistics?.CountryRank == null)
+                    {
+                        PopulateUser(p, immediate: true);
+                        addedInfo = true;
+                    }
                 }
+            }
 
             return addedInfo;
         }
@@ -214,22 +170,81 @@ namespace osu.Game.Tournament
             bool addedInfo = false;
 
             foreach (var r in ladder.Rounds)
-            foreach (var b in r.Beatmaps)
-                if (b.BeatmapInfo == null)
+            {
+                foreach (var b in r.Beatmaps.ToList())
                 {
-                    var req = new GetBeatmapRequest(new BeatmapInfo { OnlineBeatmapID = b.ID });
-                    req.Perform(API);
-                    b.BeatmapInfo = req.Result?.ToBeatmap(RulesetStore);
+                    if (b.BeatmapInfo != null)
+                        continue;
 
-                    addedInfo = true;
+                    if (b.ID > 0)
+                    {
+                        var req = new GetBeatmapRequest(new BeatmapInfo { OnlineBeatmapID = b.ID });
+                        API.Perform(req);
+                        b.BeatmapInfo = req.Result?.ToBeatmap(RulesetStore);
+
+                        addedInfo = true;
+                    }
+
+                    if (b.BeatmapInfo == null)
+                        // if online population couldn't be performed, ensure we don't leave a null value behind
+                        r.Beatmaps.Remove(b);
                 }
+            }
+
+            foreach (var t in ladder.Teams)
+            {
+                foreach (var s in t.SeedingResults)
+                {
+                    foreach (var b in s.Beatmaps)
+                    {
+                        if (b.BeatmapInfo == null && b.ID > 0)
+                        {
+                            var req = new GetBeatmapRequest(new BeatmapInfo { OnlineBeatmapID = b.ID });
+                            req.Perform(API);
+                            b.BeatmapInfo = req.Result?.ToBeatmap(RulesetStore);
+
+                            addedInfo = true;
+                        }
+                    }
+                }
+            }
 
             return addedInfo;
+        }
+
+        public void PopulateUser(User user, Action success = null, Action failure = null, bool immediate = false)
+        {
+            var req = new GetUserRequest(user.Id, Ruleset.Value);
+
+            req.Success += res =>
+            {
+                user.Id = res.Id;
+
+                user.Username = res.Username;
+                user.Statistics = res.Statistics;
+                user.Country = res.Country;
+                user.Cover = res.Cover;
+
+                success?.Invoke();
+            };
+
+            req.Failure += _ =>
+            {
+                user.Id = 1;
+                failure?.Invoke();
+            };
+
+            if (immediate)
+                API.Perform(req);
+            else
+                API.Queue(req);
         }
 
         protected override void LoadComplete()
         {
             MenuCursorContainer.Cursor.AlwaysPresent = true; // required for tooltip display
+
+            // we don't want to show the menu cursor as it would appear on stream output.
             MenuCursorContainer.Cursor.Alpha = 0;
 
             base.LoadComplete();
@@ -253,6 +268,7 @@ namespace osu.Game.Tournament
                         Formatting = Formatting.Indented,
                         NullValueHandling = NullValueHandling.Ignore,
                         DefaultValueHandling = DefaultValueHandling.Ignore,
+                        Converters = new JsonConverter[] { new JsonPointConverter() }
                     }));
             }
         }
@@ -261,7 +277,7 @@ namespace osu.Game.Tournament
 
         private class TournamentInputManager : UserInputManager
         {
-            protected override MouseButtonEventManager CreateButtonManagerFor(MouseButton button)
+            protected override MouseButtonEventManager CreateButtonEventManagerFor(MouseButton button)
             {
                 switch (button)
                 {
@@ -269,7 +285,7 @@ namespace osu.Game.Tournament
                         return new RightMouseManager(button);
                 }
 
-                return base.CreateButtonManagerFor(button);
+                return base.CreateButtonEventManagerFor(button);
             }
 
             private class RightMouseManager : MouseButtonEventManager

@@ -1,121 +1,108 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using JetBrains.Annotations;
+using System.Diagnostics;
+using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
+using osu.Framework.Input;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Platform;
+using osu.Game.Beatmaps;
+using osu.Game.Extensions;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Edit;
-using osu.Game.Screens.Edit.Compose.Components;
 using osu.Game.Screens.Edit.Compose.Components.Timeline;
-using osuTK.Graphics;
+using osu.Game.Skinning;
 
 namespace osu.Game.Screens.Edit.Compose
 {
-    public class ComposeScreen : EditorScreen
+    public class ComposeScreen : EditorScreenWithTimeline, IKeyBindingHandler<PlatformAction>
     {
-        private const float vertical_margins = 10;
-        private const float horizontal_margins = 20;
+        [Resolved]
+        private IBindable<WorkingBeatmap> beatmap { get; set; }
 
-        private readonly BindableBeatDivisor beatDivisor = new BindableBeatDivisor();
+        [Resolved]
+        private GameHost host { get; set; }
+
+        [Resolved]
+        private EditorClock clock { get; set; }
 
         private HitObjectComposer composer;
 
-        [BackgroundDependencyLoader(true)]
-        private void load([CanBeNull] BindableBeatDivisor beatDivisor)
+        public ComposeScreen()
+            : base(EditorScreenMode.Compose)
         {
-            if (beatDivisor != null)
-                this.beatDivisor.BindTo(beatDivisor);
-
-            Container composerContainer;
-
-            Children = new Drawable[]
-            {
-                new GridContainer
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Content = new[]
-                    {
-                        new Drawable[]
-                        {
-                            new Container
-                            {
-                                Name = "Timeline",
-                                RelativeSizeAxes = Axes.Both,
-                                Children = new Drawable[]
-                                {
-                                    new Box
-                                    {
-                                        RelativeSizeAxes = Axes.Both,
-                                        Colour = Color4.Black.Opacity(0.5f)
-                                    },
-                                    new Container
-                                    {
-                                        Name = "Timeline content",
-                                        RelativeSizeAxes = Axes.Both,
-                                        Padding = new MarginPadding { Horizontal = horizontal_margins, Vertical = vertical_margins },
-                                        Child = new GridContainer
-                                        {
-                                            RelativeSizeAxes = Axes.Both,
-                                            Content = new[]
-                                            {
-                                                new Drawable[]
-                                                {
-                                                    new Container
-                                                    {
-                                                        RelativeSizeAxes = Axes.Both,
-                                                        Padding = new MarginPadding { Right = 5 },
-                                                        Child = new TimelineArea { RelativeSizeAxes = Axes.Both }
-                                                    },
-                                                    new BeatDivisorControl(beatDivisor) { RelativeSizeAxes = Axes.Both }
-                                                },
-                                            },
-                                            ColumnDimensions = new[]
-                                            {
-                                                new Dimension(),
-                                                new Dimension(GridSizeMode.Absolute, 90),
-                                            }
-                                        },
-                                    }
-                                }
-                            }
-                        },
-                        new Drawable[]
-                        {
-                            composerContainer = new Container
-                            {
-                                Name = "Composer content",
-                                RelativeSizeAxes = Axes.Both,
-                                Padding = new MarginPadding { Horizontal = horizontal_margins, Vertical = vertical_margins },
-                            }
-                        }
-                    },
-                    RowDimensions = new[] { new Dimension(GridSizeMode.Absolute, 110) }
-                },
-            };
-
-            var ruleset = Beatmap.Value.BeatmapInfo.Ruleset?.CreateInstance();
-
-            if (ruleset == null)
-            {
-                Logger.Log("Beatmap doesn't have a ruleset assigned.");
-                // ExitRequested?.Invoke();
-                return;
-            }
-
-            composer = ruleset.CreateHitObjectComposer();
-
-            if (composer == null)
-            {
-                Logger.Log($"Ruleset {ruleset.Description} doesn't support hitobject composition.");
-                // ExitRequested?.Invoke();
-                return;
-            }
-
-            composerContainer.Child = composer;
         }
+
+        private Ruleset ruleset;
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+
+            ruleset = parent.Get<IBindable<WorkingBeatmap>>().Value.BeatmapInfo.Ruleset?.CreateInstance();
+            composer = ruleset?.CreateHitObjectComposer();
+
+            // make the composer available to the timeline and other components in this screen.
+            if (composer != null)
+                dependencies.CacheAs(composer);
+
+            return dependencies;
+        }
+
+        protected override Drawable CreateMainContent()
+        {
+            if (ruleset == null || composer == null)
+                return new ScreenWhiteBox.UnderConstructionMessage(ruleset == null ? "This beatmap" : $"{ruleset.Description}'s composer");
+
+            return wrapSkinnableContent(composer);
+        }
+
+        protected override Drawable CreateTimelineContent()
+        {
+            if (ruleset == null || composer == null)
+                return base.CreateTimelineContent();
+
+            return wrapSkinnableContent(new TimelineBlueprintContainer(composer));
+        }
+
+        private Drawable wrapSkinnableContent(Drawable content)
+        {
+            Debug.Assert(ruleset != null);
+
+            return new RulesetSkinProvidingContainer(ruleset, EditorBeatmap.PlayableBeatmap, beatmap.Value.Skin).WithChild(content);
+        }
+
+        #region Input Handling
+
+        public bool OnPressed(PlatformAction action)
+        {
+            if (action.ActionType == PlatformActionType.Copy)
+                host.GetClipboard().SetText(formatSelectionAsString());
+
+            return false;
+        }
+
+        public void OnReleased(PlatformAction action)
+        {
+        }
+
+        private string formatSelectionAsString()
+        {
+            if (composer == null)
+                return string.Empty;
+
+            double displayTime = EditorBeatmap.SelectedHitObjects.OrderBy(h => h.StartTime).FirstOrDefault()?.StartTime ?? clock.CurrentTime;
+            string selectionAsString = composer.ConvertSelectionToString();
+
+            return !string.IsNullOrEmpty(selectionAsString)
+                ? $"{displayTime.ToEditorFormattedString()} ({selectionAsString}) - "
+                : $"{displayTime.ToEditorFormattedString()} - ";
+        }
+
+        #endregion
     }
 }

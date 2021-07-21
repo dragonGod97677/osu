@@ -1,14 +1,16 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
 using osu.Game.Graphics;
-using osuTK;
+using osu.Game.Resources.Localisation.Web;
 
 namespace osu.Game.Overlays.Profile.Header.Components
 {
@@ -18,13 +20,13 @@ namespace osu.Game.Overlays.Profile.Header.Components
         private readonly FillFlowContainer iconContainer;
         private readonly CircularContainer content;
 
-        public string TooltipText => "osu!supporter";
+        public LocalisableString TooltipText => UsersStrings.ShowIsSupporter;
 
         public int SupportLevel
         {
             set
             {
-                int count = MathHelper.Clamp(value, 0, 3);
+                int count = Math.Clamp(value, 0, 3);
 
                 if (count == 0)
                 {

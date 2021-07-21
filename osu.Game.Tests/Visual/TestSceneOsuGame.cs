@@ -34,21 +34,17 @@ namespace osu.Game.Tests.Visual
     [TestFixture]
     public class TestSceneOsuGame : OsuTestScene
     {
-        public override IReadOnlyList<Type> RequiredTypes => new[]
-        {
-            typeof(OsuLogo),
-        };
-
         private IReadOnlyList<Type> requiredGameDependencies => new[]
         {
             typeof(OsuGame),
-            typeof(RavenLogger),
+            typeof(SentryLogger),
             typeof(OsuLogo),
             typeof(IdleTracker),
             typeof(OnScreenDisplay),
             typeof(NotificationOverlay),
-            typeof(DirectOverlay),
-            typeof(SocialOverlay),
+            typeof(BeatmapListingOverlay),
+            typeof(DashboardOverlay),
+            typeof(NewsOverlay),
             typeof(ChannelManager),
             typeof(ChatOverlay),
             typeof(SettingsOverlay),
@@ -78,7 +74,6 @@ namespace osu.Game.Tests.Visual
             typeof(FileStore),
             typeof(ScoreManager),
             typeof(BeatmapManager),
-            typeof(KeyBindingStore),
             typeof(SettingsStore),
             typeof(RulesetConfigCache),
             typeof(OsuColour),
@@ -109,16 +104,20 @@ namespace osu.Game.Tests.Visual
             AddAssert("check OsuGame DI members", () =>
             {
                 foreach (var type in requiredGameDependencies)
+                {
                     if (game.Dependencies.Get(type) == null)
-                        throw new Exception($"{type} has not been cached");
+                        throw new InvalidOperationException($"{type} has not been cached");
+                }
 
                 return true;
             });
             AddAssert("check OsuGameBase DI members", () =>
             {
                 foreach (var type in requiredGameBaseDependencies)
+                {
                     if (gameBase.Dependencies.Get(type) == null)
-                        throw new Exception($"{type} has not been cached");
+                        throw new InvalidOperationException($"{type} has not been cached");
+                }
 
                 return true;
             });

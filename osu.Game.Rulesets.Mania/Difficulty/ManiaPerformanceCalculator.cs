@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -28,8 +27,8 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         private int countMeh;
         private int countMiss;
 
-        public ManiaPerformanceCalculator(Ruleset ruleset, WorkingBeatmap beatmap, ScoreInfo score)
-            : base(ruleset, beatmap, score)
+        public ManiaPerformanceCalculator(Ruleset ruleset, DifficultyAttributes attributes, ScoreInfo score)
+            : base(ruleset, attributes, score)
         {
         }
 
@@ -37,15 +36,12 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         {
             mods = Score.Mods;
             scaledScore = Score.TotalScore;
-            countPerfect = Convert.ToInt32(Score.Statistics[HitResult.Perfect]);
-            countGreat = Convert.ToInt32(Score.Statistics[HitResult.Great]);
-            countGood = Convert.ToInt32(Score.Statistics[HitResult.Good]);
-            countOk = Convert.ToInt32(Score.Statistics[HitResult.Ok]);
-            countMeh = Convert.ToInt32(Score.Statistics[HitResult.Meh]);
-            countMiss = Convert.ToInt32(Score.Statistics[HitResult.Miss]);
-
-            if (mods.Any(m => !m.Ranked))
-                return 0;
+            countPerfect = Score.Statistics.GetValueOrDefault(HitResult.Perfect);
+            countGreat = Score.Statistics.GetValueOrDefault(HitResult.Great);
+            countGood = Score.Statistics.GetValueOrDefault(HitResult.Good);
+            countOk = Score.Statistics.GetValueOrDefault(HitResult.Ok);
+            countMeh = Score.Statistics.GetValueOrDefault(HitResult.Meh);
+            countMiss = Score.Statistics.GetValueOrDefault(HitResult.Miss);
 
             IEnumerable<Mod> scoreIncreaseMods = Ruleset.GetModsFor(ModType.DifficultyIncrease);
 

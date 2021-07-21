@@ -10,10 +10,13 @@ namespace osu.Game.Rulesets.Osu
         Cursor,
         CursorTrail,
         SliderScorePoint,
-        ApproachCircle,
         ReverseArrow,
         HitCircleText,
+        SliderHeadHitCircle,
+        SliderTailHitCircle,
         SliderFollowCircle,
-        SliderBall
+        SliderBall,
+        SliderBody,
+        SpinnerBody,
     }
 }

@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osuTK;
 using osuTK.Graphics;
@@ -18,7 +19,9 @@ namespace osu.Game.Graphics.UserInterface
         public string Link { get; set; }
 
         private Color4 hoverColour;
-        private GameHost host;
+
+        [Resolved]
+        private GameHost host { get; set; }
 
         public ExternalLinkButton(string link = null)
         {
@@ -32,10 +35,9 @@ namespace osu.Game.Graphics.UserInterface
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, GameHost host)
+        private void load(OsuColour colours)
         {
             hoverColour = colours.Yellow;
-            this.host = host;
         }
 
         protected override bool OnHover(HoverEvent e)
@@ -57,6 +59,6 @@ namespace osu.Game.Graphics.UserInterface
             return true;
         }
 
-        public string TooltipText => "View in browser";
+        public LocalisableString TooltipText => "view in browser";
     }
 }

@@ -13,11 +13,12 @@ namespace osu.Game.Tests.Visual.UserInterface
     {
         public TestScenePopupDialog()
         {
-            Add(new TestPopupDialog
-            {
-                RelativeSizeAxes = Axes.Both,
-                State = { Value = Framework.Graphics.Containers.Visibility.Visible },
-            });
+            AddStep("new popup", () =>
+                Add(new TestPopupDialog
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    State = { Value = Framework.Graphics.Containers.Visibility.Visible },
+                }));
         }
 
         private class TestPopupDialog : PopupDialog

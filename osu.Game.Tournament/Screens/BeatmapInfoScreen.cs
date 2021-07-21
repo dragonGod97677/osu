@@ -11,7 +11,7 @@ using osu.Game.Tournament.IPC;
 
 namespace osu.Game.Tournament.Screens
 {
-    public abstract class BeatmapInfoScreen : TournamentScreen
+    public abstract class BeatmapInfoScreen : TournamentMatchScreen
     {
         protected readonly SongBar SongBar;
 
@@ -21,6 +21,7 @@ namespace osu.Game.Tournament.Screens
             {
                 Anchor = Anchor.BottomRight,
                 Origin = Anchor.BottomRight,
+                Depth = float.MinValue,
             });
         }
 

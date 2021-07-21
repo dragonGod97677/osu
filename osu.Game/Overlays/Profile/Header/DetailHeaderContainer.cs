@@ -11,6 +11,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays.Profile.Header.Components;
+using osu.Game.Resources.Localisation.Web;
 using osu.Game.Scoring;
 using osu.Game.Users;
 using osuTK;
@@ -54,7 +55,7 @@ namespace osu.Game.Overlays.Profile.Header
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours)
+        private void load(OverlayColourProvider colourProvider, OsuColour colours)
         {
             AutoSizeAxes = Axes.Y;
 
@@ -65,7 +66,7 @@ namespace osu.Game.Overlays.Profile.Header
                 new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colours.GreySeafoamDarker,
+                    Colour = colourProvider.Background5,
                 },
                 fillFlow = new FillFlowContainer
                 {
@@ -100,7 +101,7 @@ namespace osu.Game.Overlays.Profile.Header
                                         },
                                         medalInfo = new OverlinedInfoContainer
                                         {
-                                            Title = "Medals",
+                                            Title = UsersStrings.ShowStatsMedals,
                                             LineColour = colours.GreenLight,
                                         },
                                         ppInfo = new OverlinedInfoContainer
@@ -151,13 +152,13 @@ namespace osu.Game.Overlays.Profile.Header
                                     {
                                         detailGlobalRank = new OverlinedInfoContainer(true, 110)
                                         {
-                                            Title = "Global Ranking",
-                                            LineColour = colours.Yellow,
+                                            Title = UsersStrings.ShowRankGlobalSimple,
+                                            LineColour = colourProvider.Highlight1,
                                         },
                                         detailCountryRank = new OverlinedInfoContainer(false, 110)
                                         {
-                                            Title = "Country Ranking",
-                                            LineColour = colours.Yellow,
+                                            Title = UsersStrings.ShowRankCountrySimple,
+                                            LineColour = colourProvider.Highlight1,
                                         },
                                     }
                                 }
@@ -176,8 +177,8 @@ namespace osu.Game.Overlays.Profile.Header
             foreach (var scoreRankInfo in scoreRankInfos)
                 scoreRankInfo.Value.RankCount = user?.Statistics?.GradesCount[scoreRankInfo.Key] ?? 0;
 
-            detailGlobalRank.Content = user?.Statistics?.Ranks.Global?.ToString("\\##,##0") ?? "-";
-            detailCountryRank.Content = user?.Statistics?.Ranks.Country?.ToString("\\##,##0") ?? "-";
+            detailGlobalRank.Content = user?.Statistics?.GlobalRank?.ToString("\\##,##0") ?? "-";
+            detailCountryRank.Content = user?.Statistics?.CountryRank?.ToString("\\##,##0") ?? "-";
 
             rankGraph.Statistics.Value = user?.Statistics;
         }

@@ -44,6 +44,7 @@ namespace osu.Game.Graphics.UserInterface
         private readonly Box hover;
 
         public OsuAnimatedButton()
+            : base(HoverSampleSet.Button)
         {
             base.Content.Add(content = new Container
             {
@@ -107,10 +108,10 @@ namespace osu.Game.Graphics.UserInterface
             return base.OnMouseDown(e);
         }
 
-        protected override bool OnMouseUp(MouseUpEvent e)
+        protected override void OnMouseUp(MouseUpEvent e)
         {
             Content.ScaleTo(1, 1000, Easing.OutElastic);
-            return base.OnMouseUp(e);
+            base.OnMouseUp(e);
         }
     }
 }

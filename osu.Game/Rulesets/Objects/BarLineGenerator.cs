@@ -1,12 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.MathUtils;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
-using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Rulesets.Objects
 {
@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Objects
                 return;
 
             HitObject lastObject = beatmap.HitObjects.Last();
-            double lastHitTime = 1 + ((lastObject as IHasEndTime)?.EndTime ?? lastObject.StartTime);
+            double lastHitTime = 1 + lastObject.GetEndTime();
 
             var timingPoints = beatmap.ControlPointInfo.TimingPoints;
 
@@ -47,6 +47,16 @@ namespace osu.Game.Rulesets.Objects
 
                 for (double t = currentTimingPoint.Time; Precision.DefinitelyBigger(endTime, t); t += barLength, currentBeat++)
                 {
+                    var roundedTime = Math.Round(t, MidpointRounding.AwayFromZero);
+
+                    // in the case of some bar lengths, rounding errors can cause t to be slightly less than
+                    // the expected whole number value due to floating point inaccuracies.
+                    // if this is the case, apply rounding.
+                    if (Precision.AlmostEquals(t, roundedTime))
+                    {
+                        t = roundedTime;
+                    }
+
                     BarLines.Add(new TBarLine
                     {
                         StartTime = t,

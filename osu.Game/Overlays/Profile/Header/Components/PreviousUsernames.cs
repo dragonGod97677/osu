@@ -11,6 +11,8 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Resources.Localisation.Web;
 using osu.Game.Users;
 using osuTK;
 
@@ -56,18 +58,18 @@ namespace osu.Game.Overlays.Profile.Header.Components
                     ColumnDimensions = new[]
                     {
                         new Dimension(GridSizeMode.AutoSize),
-                        new Dimension(GridSizeMode.Distributed)
+                        new Dimension()
                     },
                     Content = new[]
                     {
                         new Drawable[]
                         {
                             hoverIcon = new HoverIconContainer(),
-                            header = new SpriteText
+                            header = new OsuSpriteText
                             {
                                 Anchor = Anchor.BottomLeft,
                                 Origin = Anchor.BottomLeft,
-                                Text = @"formerly known as",
+                                Text = UsersStrings.ShowPreviousUsernames,
                                 Font = OsuFont.GetFont(size: 10, italics: true)
                             }
                         },

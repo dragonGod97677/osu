@@ -30,8 +30,8 @@ namespace osu.Game.Rulesets.Osu.Objects
             TimePreempt = (StartTime - SpanStartTime) / 2 + offset;
         }
 
-        public override Judgement CreateJudgement() => new OsuJudgement();
+        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
 
-        protected override HitWindows CreateHitWindows() => null;
+        public override Judgement CreateJudgement() => new SliderTickJudgement();
     }
 }
